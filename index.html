@@ -1,0 +1,96 @@
+<html>
+<head>
+	<script src="///yastatic.net/jquery/1.12.3/jquery.min.js" type="text/javascript"></script>
+	<script src="///yastatic.net/jquery-ui/1.11.2/jquery-ui.min.js" type="text/javascript"></script>
+	<script src="///api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+
+	<link rel="stylesheet" href="///yastatic.net/jquery-ui/1.11.2/themes/base/jquery-ui.min.css" />
+</head>
+<body>
+	<div id="map" style="width: 1200px; height: 800px; margin: auto; border: 1px solid black;"></div>
+	<div id="slider" style="width: 1200px; height: 20px; margin: auto; margin-top: 10px;">
+		<div id="custom-handle" class="ui-slider-handle"></div>
+	</div>
+
+	<script type="text/javascript">
+	//<![CDATA[
+	var geoRadius = 6356.752 * 1000;
+
+	var kgoCoords = [43.736158,42.667398];
+	var map;
+	var kgoGeoObject;
+	var circleGeoObjects = [];
+
+	function init_circles(map) {
+		Array.apply(null, Array(8)).map(function (_, i) {return i*10+10;}).forEach(function (x, i) {
+			circleGeoObjects[i] = {
+				polarDeg: x,
+				polar: x * Math.PI / 180,
+				geoObj: new ymaps.Circle([kgoCoords, 1000*10*x], {}, {
+					fill: false,
+					geodesic: true,
+					cursor: 'drag',
+					visible: false,
+				})
+			};
+			map.geoObjects.add(circleGeoObjects[i].geoObj);
+		});
+	};
+	function calculateDist(polar, alt) {
+		var polarCos = Math.cos(polar);
+		var polarSin = Math.sin(polar);
+		var det = Math.sqrt(alt*alt + 2*alt*geoRadius + geoRadius*geoRadius*polarCos*polarCos);
+		var distCos = (geoRadius*polarSin*polarSin + polarCos*det) / (alt + geoRadius);
+	//	var dist = Math.acos(distCos);
+		var dist = 2*Math.atan2(Math.sqrt(1 - distCos), Math.sqrt(1 + distCos));
+		return dist * geoRadius;
+	}
+	function refreshCircles(altKm) {
+		var alt = altKm * 1000;
+		circleGeoObjects.forEach(function(x) {
+			x.geoObj.geometry.setRadius(calculateDist(x.polar, alt));
+			x.geoObj.options.set({visible: true});
+		});
+	};
+	function init_map() {
+		kgoGeoObject = new ymaps.GeoObject({
+			geometry: {
+				type: "Point",
+				coordinates: kgoCoords
+			}}, {
+			preset: "islands#circleDotIcon"
+			});
+
+		map = new ymaps.Map("map", {
+			center: kgoCoords, 
+			zoom: 10
+		});
+
+		map.controls.add('rulerControl');
+		map.geoObjects.add(kgoGeoObject);
+		init_circles(map);
+		refreshCircles($("#slider").slider("value"));
+	};
+	$(document).ready(function(){
+		var sliderHandle = $("#custom-handle");
+		$("#slider").slider({
+			orientation: "horizontal",
+			min: 1,
+			max: 120,
+			value: 10,
+			create: function() {
+				sliderHandle.text($(this).slider("value"));
+				refreshCircles($(this).slider("value"));
+			},
+			slide: function(event, ui) {
+				sliderHandle.text(ui.value);
+				refreshCircles(ui.value);
+			}
+		});
+
+		ymaps.ready(init_map);
+	});
+	//]]>
+	</script>
+</body>
+</html>
